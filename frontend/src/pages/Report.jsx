@@ -24,20 +24,68 @@ const Report = () => {
 
   const loadReport = async () => {
     try {
-      // Try to get from API first
-      const response = await getReport()
-      setReportData(response)
+      // Get data from localStorage
+      const resumeDataStr = localStorage.getItem('resumeData')
+      const interviewResultStr = localStorage.getItem('interviewResult')
+      
+      const resumeData = resumeDataStr ? JSON.parse(resumeDataStr) : {}
+      const interviewResult = interviewResultStr ? JSON.parse(interviewResultStr) : {}
+      
+      // Get scores from stored data (handle both snake_case and camelCase)
+      const resumeScore = resumeData.ats_score || resumeData.atsScore || 70
+      const technicalScore = interviewResult.technical_score || interviewResult.technicalScore || 75
+      const hrScore = interviewResult.hr_score || interviewResult.hrScore || 72
+      
+      // Try to get full report from API
+      const response = await getReport({
+        resume_score: resumeScore,
+        technical_score: technicalScore,
+        hr_score: hrScore,
+        role: resumeData.role || 'SDE'
+      })
+      
+      // Map API response to expected format
+      setReportData({
+        resumeScore: response.scores?.resume_score || resumeScore,
+        technicalScore: response.scores?.technical_score || technicalScore,
+        hrScore: response.scores?.hr_score || hrScore,
+        overallReadiness: response.overall_readiness,
+        readinessLevel: response.readiness_level,
+        skills: {
+          problemSolving: 85,
+          communication: 78,
+          technicalKnowledge: technicalScore,
+          leadership: 70,
+          adaptability: 88,
+          teamwork: 75,
+        },
+        improvements: response.action_items?.map((item, index) => ({
+          id: index + 1,
+          text: item.action,
+          timeframe: item.timeframe,
+          completed: false
+        })) || [
+          { id: 1, text: 'Add more quantifiable achievements to your resume', completed: false },
+          { id: 2, text: 'Practice explaining complex technical concepts simply', completed: false },
+          { id: 3, text: 'Prepare more STAR-method stories for behavioral questions', completed: false },
+        ],
+        summary: response.summary,
+        strengths: response.strengths,
+        weaknesses: response.weaknesses
+      })
     } catch {
-      // Fallback to localStorage data
+      // Fallback to localStorage data only
       const resumeData = localStorage.getItem('resumeData')
       const interviewResult = localStorage.getItem('interviewResult')
       
+      const parsedResume = resumeData ? JSON.parse(resumeData) : {}
+      const parsedInterview = interviewResult ? JSON.parse(interviewResult) : {}
+      
       if (resumeData || interviewResult) {
-        // Mock data based on localStorage
         setReportData({
-          resumeScore: JSON.parse(resumeData || '{}').atsScore || 75,
-          technicalScore: 78,
-          hrScore: 82,
+          resumeScore: parsedResume.ats_score || parsedResume.atsScore || 75,
+          technicalScore: parsedInterview.technical_score || parsedInterview.technicalScore || 78,
+          hrScore: parsedInterview.hr_score || parsedInterview.hrScore || 82,
           skills: {
             problemSolving: 85,
             communication: 78,
@@ -270,7 +318,7 @@ const Report = () => {
           >
             <motion.div variants={fadeInUp}>
               <ScoreCard 
-                title="Resume Score"
+                title="ATS Score"
                 score={reportData.resumeScore}
                 description="ATS compatibility and content quality"
                 icon={<svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

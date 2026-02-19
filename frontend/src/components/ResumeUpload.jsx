@@ -2,9 +2,9 @@ import { useState, useRef } from 'react'
 import { uploadResume } from '../services'
 
 const TARGET_ROLES = [
-  { value: 'sde', label: 'Software Development Engineer (SDE)' },
-  { value: 'data_analyst', label: 'Data Analyst' },
-  { value: 'ml_engineer', label: 'ML Engineer' },
+  { value: 'SDE', label: 'Software Development Engineer (SDE)' },
+  { value: 'Data Analyst', label: 'Data Analyst' },
+  { value: 'ML Engineer', label: 'ML Engineer' },
 ]
 
 const ResumeUpload = ({ onUploadSuccess }) => {
@@ -74,14 +74,15 @@ const ResumeUpload = ({ onUploadSuccess }) => {
 
     try {
       const formData = new FormData()
-      formData.append('resume', file)
-      formData.append('targetRole', targetRole)
+      formData.append('file', file)
+      formData.append('role', targetRole)
       
       const response = await uploadResume(formData)
       setAtsResult(response)
       onUploadSuccess?.(response)
     } catch (err) {
-      setError(err.message || 'Failed to upload resume')
+      const errorMsg = typeof err === 'string' ? err : (err.message || err.detail || 'Failed to upload resume')
+      setError(errorMsg)
     } finally {
       setIsUploading(false)
     }
@@ -254,20 +255,20 @@ const ResumeUpload = ({ onUploadSuccess }) => {
             </h3>
             
             <div className="flex items-center gap-6">
-              <div className={`text-5xl font-bold ${getScoreColor(atsResult.atsScore || 0)}`}>
-                {atsResult.atsScore || 0}%
+              <div className={`text-5xl font-bold ${getScoreColor(atsResult.ats_score || 0)}`}>
+                {atsResult.ats_score || 0}%
               </div>
               <div className="flex-1">
                 <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full bg-gradient-to-r ${getScoreBgColor(atsResult.atsScore || 0)} transition-all duration-1000 ease-out`}
-                    style={{ width: `${atsResult.atsScore || 0}%` }}
+                    className={`h-full bg-gradient-to-r ${getScoreBgColor(atsResult.ats_score || 0)} transition-all duration-1000 ease-out`}
+                    style={{ width: `${atsResult.ats_score || 0}%` }}
                   />
                 </div>
                 <p className="text-sm text-slate-400 mt-2">
-                  {atsResult.atsScore >= 80 
+                  {atsResult.ats_score >= 80 
                     ? 'Excellent! Your resume is well-optimized.'
-                    : atsResult.atsScore >= 60
+                    : atsResult.ats_score >= 60
                     ? 'Good, but there\'s room for improvement.'
                     : 'Needs improvement to pass ATS filters.'}
                 </p>
@@ -276,7 +277,7 @@ const ResumeUpload = ({ onUploadSuccess }) => {
           </div>
 
           {/* Missing Skills */}
-          {atsResult.missingSkills && atsResult.missingSkills.length > 0 && (
+          {atsResult.missing_skills && atsResult.missing_skills.length > 0 && (
             <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +287,7 @@ const ResumeUpload = ({ onUploadSuccess }) => {
               </h3>
               
               <div className="flex flex-wrap gap-2">
-                {atsResult.missingSkills.map((skill, index) => (
+                {atsResult.missing_skills.map((skill, index) => (
                   <span 
                     key={index}
                     className="px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm"
@@ -303,7 +304,7 @@ const ResumeUpload = ({ onUploadSuccess }) => {
           )}
 
           {/* Detected Skills */}
-          {atsResult.detectedSkills && atsResult.detectedSkills.length > 0 && (
+          {atsResult.matched_skills && atsResult.matched_skills.length > 0 && (
             <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -313,7 +314,7 @@ const ResumeUpload = ({ onUploadSuccess }) => {
               </h3>
               
               <div className="flex flex-wrap gap-2">
-                {atsResult.detectedSkills.map((skill, index) => (
+                {atsResult.matched_skills.map((skill, index) => (
                   <span 
                     key={index}
                     className="px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm"

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // Base URL for all API requests
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -18,7 +18,7 @@ apiClient.interceptors.response.use(
   (error) => {
     const message =
       error.response?.data?.message ||
-      error.response?.data?.error ||
+      error.response?.data?.detail ||
       error.message ||
       'An unexpected error occurred'
     
@@ -33,7 +33,7 @@ apiClient.interceptors.response.use(
  * @returns {Promise} - Parsed resume data
  */
 export const uploadResume = async (formData) => {
-  return apiClient.post('/upload-resume', formData, {
+  return apiClient.post('/resume/upload-resume', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -46,7 +46,7 @@ export const uploadResume = async (formData) => {
  * @returns {Promise} - Interview session data with first question
  */
 export const startInterview = async (data) => {
-  return apiClient.post('/start-interview', data)
+  return apiClient.post('/interview/start-interview', data)
 }
 
 /**
@@ -55,7 +55,7 @@ export const startInterview = async (data) => {
  * @returns {Promise} - Next question or completion status
  */
 export const submitAnswer = async (data) => {
-  return apiClient.post('/submit-answer', data)
+  return apiClient.post('/interview/submit-answer', data)
 }
 
 /**
@@ -64,15 +64,16 @@ export const submitAnswer = async (data) => {
  * @returns {Promise} - Next HR question or completion status
  */
 export const submitHRAnswer = async (data) => {
-  return apiClient.post('/submit-hr-answer', data)
+  return apiClient.post('/hr/hr-round', data)
 }
 
 /**
  * Get the final interview report
+ * @param {Object} data - Scores data
  * @returns {Promise} - Complete interview report with scores and feedback
  */
-export const getReport = async () => {
-  return apiClient.get('/report')
+export const getReport = async (data) => {
+  return apiClient.post('/report/generate-report', data)
 }
 
 // Export the axios instance for custom requests

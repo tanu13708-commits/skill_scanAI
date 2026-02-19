@@ -23,10 +23,10 @@ const Interview = () => {
 
   return (
     <PageTransition>
-      <div className="h-[calc(100vh-64px-73px)] flex flex-col">
+      <div className="min-h-[calc(100vh-140px)] flex flex-col overflow-hidden">
         {/* Header */}
         <motion.div 
-          className="bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4"
+          className="bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex-shrink-0"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
@@ -62,13 +62,13 @@ const Interview = () => {
 
         {/* Chat Area */}
         <motion.div 
-          className="flex-1 bg-slate-900/30 backdrop-blur-sm"
+          className="flex-1 bg-slate-900/30 backdrop-blur-sm overflow-hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <div className="container mx-auto h-full max-w-4xl">
-            <div className="bg-white/5 backdrop-blur-xl h-full border-x border-white/10">
+            <div className="bg-white/5 backdrop-blur-xl h-full border-x border-white/10 overflow-hidden">
               <InterviewChat 
                 resumeData={resumeData} 
                 onComplete={handleInterviewComplete} 

@@ -4,11 +4,13 @@ import { startInterview, submitAnswer } from '../services'
 const InterviewChat = ({ resumeData, onComplete }) => {
   const [messages, setMessages] = useState([])
   const [currentQuestion, setCurrentQuestion] = useState(null)
+  const [currentDifficulty, setCurrentDifficulty] = useState('medium')
   const [userInput, setUserInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [questionNumber, setQuestionNumber] = useState(0)
   const [totalQuestions] = useState(5)
+  const [scores, setScores] = useState([])
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -22,10 +24,14 @@ const InterviewChat = ({ resumeData, onComplete }) => {
   const handleStartInterview = async () => {
     setIsLoading(true)
     try {
-      const response = await startInterview({ resumeData })
+      const response = await startInterview({ 
+        role: resumeData?.role || 'SDE',
+        difficulty: 'medium'
+      })
       setInterviewStarted(true)
-      setQuestionNumber(1)
+      setQuestionNumber(response.question_number || 1)
       setCurrentQuestion(response.question)
+      setCurrentDifficulty(response.difficulty || 'medium')
       setMessages([
         {
           type: 'system',
@@ -37,10 +43,11 @@ const InterviewChat = ({ resumeData, onComplete }) => {
         },
       ])
     } catch (error) {
+      const errorMsg = typeof error === 'string' ? error : (error.message || 'Failed to start interview. Please try again.')
       setMessages([
         {
           type: 'error',
-          content: error.message || 'Failed to start interview. Please try again.',
+          content: errorMsg,
         },
       ])
     } finally {
@@ -66,22 +73,30 @@ const InterviewChat = ({ resumeData, onComplete }) => {
       const response = await submitAnswer({
         question: currentQuestion,
         answer,
-        questionNumber,
+        difficulty: currentDifficulty,
+        role: resumeData?.role || 'SDE'
       })
 
       // Add evaluation feedback
-      if (response.score !== undefined || response.feedback) {
+      const evalScore = response.evaluation?.score
+      const evalFeedback = response.evaluation?.feedback
+      if (evalScore !== undefined || evalFeedback) {
+        setScores(prev => [...prev, evalScore])
         setMessages((prev) => [
           ...prev,
           {
             type: 'evaluation',
-            score: response.score,
-            feedback: response.feedback,
+            score: evalScore,
+            feedback: evalFeedback,
           },
         ])
       }
 
-      if (response.isComplete) {
+      // Check if we've completed enough questions
+      if (questionNumber >= totalQuestions) {
+        const avgScore = scores.length > 0 
+          ? Math.round([...scores, evalScore].reduce((a, b) => a + b, 0) / (scores.length + 1))
+          : evalScore
         setMessages((prev) => [
           ...prev,
           {
@@ -89,21 +104,25 @@ const InterviewChat = ({ resumeData, onComplete }) => {
             content: 'Technical interview completed! Moving to the next round...',
           },
         ])
-        onComplete?.(response)
+        onComplete?.({ technical_score: avgScore })
       } else {
         setQuestionNumber((prev) => prev + 1)
-        setCurrentQuestion(response.nextQuestion)
+        const nextQ = response.next_question?.question
+        const nextDiff = response.next_question?.difficulty || currentDifficulty
+        setCurrentQuestion(nextQ)
+        setCurrentDifficulty(nextDiff)
         setMessages((prev) => [
           ...prev,
-          { type: 'ai', content: response.nextQuestion },
+          { type: 'ai', content: nextQ },
         ])
       }
     } catch (error) {
+      const errorMsg = typeof error === 'string' ? error : (error.message || 'Failed to submit answer. Please try again.')
       setMessages((prev) => [
         ...prev,
         {
           type: 'error',
-          content: error.message || 'Failed to submit answer. Please try again.',
+          content: errorMsg,
         },
       ])
     } finally {
@@ -284,7 +303,7 @@ const InterviewChat = ({ resumeData, onComplete }) => {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmitAnswer} className="p-4 border-t border-slate-700">
+      <form onSubmit={handleSubmitAnswer} className="p-4 border-t border-slate-700 bg-slate-900/95 backdrop-blur-sm relative z-20">
         <div className="flex gap-3">
           <textarea
             value={userInput}
