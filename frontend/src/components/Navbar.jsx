@@ -48,6 +48,7 @@ const Navbar = () => {
             {[
               { to: '/', label: 'Home', end: true },
               { to: '/interview', label: 'Interview' },
+              { to: '/video-interview', label: 'Video' },
               { to: '/practice', label: 'Practice' },
               { to: '/report', label: 'Report' },
             ].map((link, index) => (
@@ -102,6 +103,11 @@ const Navbar = () => {
                 <li>
                   <NavLink to="/interview" className={mobileLinkClasses} onClick={() => setIsMenuOpen(false)}>
                     Interview
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/video-interview" className={mobileLinkClasses} onClick={() => setIsMenuOpen(false)}>
+                    Video Interview
                   </NavLink>
                 </li>
                 <li>

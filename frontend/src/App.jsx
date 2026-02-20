@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { Navbar } from './components'
-import { Home, Interview, Report, Practice } from './pages'
+import { Home, Interview, Report, Practice, VideoInterviewPage } from './pages'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -13,6 +13,7 @@ function AnimatedRoutes() {
         <Route path="/interview" element={<Interview />} />
         <Route path="/practice" element={<Practice />} />
         <Route path="/report" element={<Report />} />
+        <Route path="/video-interview" element={<VideoInterviewPage />} />
       </Routes>
     </AnimatePresence>
   )
