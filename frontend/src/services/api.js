@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-// Base URL for all API requests
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+// Base URL for all API requests - use relative path for proxy
+const API_BASE_URL = '/api'
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -74,6 +74,26 @@ export const submitHRAnswer = async (data) => {
  */
 export const getReport = async (data) => {
   return apiClient.post('/report/generate-report', data)
+}
+
+/**
+ * Improve a single resume bullet point
+ * @param {string} bullet - Original bullet point text
+ * @param {string} role - Target role (SDE, Data Analyst, ML Engineer)
+ * @returns {Promise} - Improved bullet point with suggestions
+ */
+export const improveBullet = async (bullet, role = 'SDE') => {
+  return apiClient.post('/resume/improve-bullet', { bullet, role })
+}
+
+/**
+ * Improve multiple bullet points at once
+ * @param {string[]} bullets - Array of bullet point texts
+ * @param {string} role - Target role
+ * @returns {Promise} - Array of improved bullet points
+ */
+export const improveBulletsBatch = async (bullets, role = 'SDE') => {
+  return apiClient.post('/resume/improve-bullets-batch', { bullets, role })
 }
 
 // Export the axios instance for custom requests

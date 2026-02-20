@@ -62,7 +62,7 @@ const HRInterview = ({ resumeData, onComplete }) => {
         setCurrentQuestionIndex((prev) => prev + 1)
       } else {
         setShowResults(true)
-        onComplete?.({ answers: [...answers, newAnswer] })
+        // Don't call onComplete immediately - let user see results first
       }
     } catch (error) {
       console.error('Error submitting HR answer:', error)
@@ -198,6 +198,16 @@ const HRInterview = ({ resumeData, onComplete }) => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* View Report Button */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => onComplete?.({ answers })}
+            className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg"
+          >
+            View Report →
+          </button>
         </div>
       </div>
     )

@@ -1,16 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { startInterview, submitAnswer } from '../services'
+import CommunicationScore, { CommunicationBadge } from './CommunicationScore'
 
-const InterviewChat = ({ resumeData, onComplete }) => {
+const InterviewChat = ({ resumeData, company, onComplete }) => {
   const [messages, setMessages] = useState([])
   const [currentQuestion, setCurrentQuestion] = useState(null)
   const [currentDifficulty, setCurrentDifficulty] = useState('medium')
   const [userInput, setUserInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [interviewStarted, setInterviewStarted] = useState(false)
+  const [interviewCompleted, setInterviewCompleted] = useState(false)
   const [questionNumber, setQuestionNumber] = useState(0)
   const [totalQuestions] = useState(5)
   const [scores, setScores] = useState([])
+  const [feedbackHistory, setFeedbackHistory] = useState([]) // Store all Q&A with feedback
+  const [companyTips, setCompanyTips] = useState([])
+  const [currentQuestionType, setCurrentQuestionType] = useState('technical')
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -26,20 +31,26 @@ const InterviewChat = ({ resumeData, onComplete }) => {
     try {
       const response = await startInterview({ 
         role: resumeData?.role || 'SDE',
-        difficulty: 'medium'
+        difficulty: 'medium',
+        company: company?.id || 'generic'
       })
       setInterviewStarted(true)
       setQuestionNumber(response.question_number || 1)
       setCurrentQuestion(response.question)
       setCurrentDifficulty(response.difficulty || 'medium')
+      setCompanyTips(response.tips || [])
+      
+      const companyName = company?.name || 'General'
+      setCurrentQuestionType(response.question_type || 'technical')
       setMessages([
         {
           type: 'system',
-          content: 'Welcome to your Technical Interview. I will ask you a series of questions based on your resume and skills. Take your time to provide thoughtful answers.',
+          content: `Welcome to your ${companyName} Technical Interview. Questions are tailored to ${companyName}'s interview style. Take your time to provide thoughtful answers.`,
         },
         {
           type: 'ai',
           content: response.question,
+          questionType: response.question_type,
         },
       ])
     } catch (error) {
@@ -74,22 +85,27 @@ const InterviewChat = ({ resumeData, onComplete }) => {
         question: currentQuestion,
         answer,
         difficulty: currentDifficulty,
-        role: resumeData?.role || 'SDE'
+        role: resumeData?.role || 'SDE',
+        company: company?.id || 'generic',
+        question_type: currentQuestionType
       })
 
-      // Add evaluation feedback
+      // Store evaluation feedback (don't display immediately)
       const evalScore = response.evaluation?.score
       const evalFeedback = response.evaluation?.feedback
+      const commAnalysis = response.communication
       if (evalScore !== undefined || evalFeedback) {
         setScores(prev => [...prev, evalScore])
-        setMessages((prev) => [
-          ...prev,
-          {
-            type: 'evaluation',
-            score: evalScore,
-            feedback: evalFeedback,
-          },
-        ])
+        // Store feedback for end summary
+        setFeedbackHistory(prev => [...prev, {
+          questionNum: questionNumber,
+          question: currentQuestion,
+          questionType: currentQuestionType,
+          answer: answer,
+          score: evalScore,
+          feedback: evalFeedback,
+          communication: commAnalysis,
+        }])
       }
 
       // Check if we've completed enough questions
@@ -97,23 +113,19 @@ const InterviewChat = ({ resumeData, onComplete }) => {
         const avgScore = scores.length > 0 
           ? Math.round([...scores, evalScore].reduce((a, b) => a + b, 0) / (scores.length + 1))
           : evalScore
-        setMessages((prev) => [
-          ...prev,
-          {
-            type: 'system',
-            content: 'Technical interview completed! Moving to the next round...',
-          },
-        ])
+        setInterviewCompleted(true)
         onComplete?.({ technical_score: avgScore })
       } else {
         setQuestionNumber((prev) => prev + 1)
         const nextQ = response.next_question?.question
         const nextDiff = response.next_question?.difficulty || currentDifficulty
+        const nextType = response.next_question?.question_type || 'technical'
         setCurrentQuestion(nextQ)
         setCurrentDifficulty(nextDiff)
+        setCurrentQuestionType(nextType)
         setMessages((prev) => [
           ...prev,
-          { type: 'ai', content: nextQ },
+          { type: 'ai', content: nextQ, questionType: nextType },
         ])
       }
     } catch (error) {
@@ -256,6 +268,157 @@ const InterviewChat = ({ resumeData, onComplete }) => {
             </>
           )}
         </button>
+      </div>
+    )
+  }
+
+  // Show feedback summary when interview is completed
+  if (interviewCompleted) {
+    const avgScore = scores.length > 0 
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 0
+    const overallColors = getScoreColor(avgScore)
+
+    return (
+      <div className="flex flex-col h-full overflow-y-auto p-6">
+        {/* Overall Score Card */}
+        <div className="bg-slate-800/80 rounded-2xl p-6 mb-6 border border-slate-700">
+          <h2 className="text-2xl font-bold text-white mb-4 text-center">Technical Interview Complete!</h2>
+          <div className="flex items-center justify-center gap-6">
+            <div className={`text-5xl font-bold ${overallColors.text}`}>{avgScore}/100</div>
+            <div className="flex-1 max-w-xs">
+              <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${overallColors.bg} transition-all duration-500`}
+                  style={{ width: `${avgScore}%` }}
+                />
+              </div>
+              <p className="text-slate-400 text-sm mt-2 text-center">Overall Score</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Communication Summary */}
+        {feedbackHistory.some(item => item.communication) && (
+          <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 mb-6">
+            <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" 
+                />
+              </svg>
+              Communication Summary
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              {(() => {
+                const commItems = feedbackHistory.filter(i => i.communication);
+                const avgClarity = commItems.length > 0 
+                  ? Math.round(commItems.reduce((s, i) => s + (i.communication.clarity_score || 0), 0) / commItems.length) 
+                  : 0;
+                const avgStructure = commItems.length > 0 
+                  ? Math.round(commItems.reduce((s, i) => s + (i.communication.structure_score || 0), 0) / commItems.length) 
+                  : 0;
+                const avgConfidence = commItems.length > 0 
+                  ? Math.round(commItems.reduce((s, i) => s + (i.communication.confidence_score || 0), 0) / commItems.length) 
+                  : 0;
+                const getColor = (s) => s >= 7 ? 'text-green-400' : s >= 5 ? 'text-yellow-400' : 'text-red-400';
+                return (
+                  <>
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${getColor(avgClarity)}`}>{avgClarity}/10</div>
+                      <div className="text-sm text-gray-400">Avg Clarity</div>
+                    </div>
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${getColor(avgStructure)}`}>{avgStructure}/10</div>
+                      <div className="text-sm text-gray-400">Avg Structure</div>
+                    </div>
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${getColor(avgConfidence)}`}>{avgConfidence}/10</div>
+                      <div className="text-sm text-gray-400">Avg Confidence</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Individual Question Feedback */}
+        <h3 className="text-xl font-semibold text-white mb-4">Question-wise Feedback</h3>
+        <div className="space-y-4">
+          {feedbackHistory.map((item, index) => {
+            const scoreColors = getScoreColor(item.score || 0)
+            return (
+              <div key={index} className={`bg-slate-800/60 rounded-xl p-5 border ${scoreColors.border}`}>
+                {/* Question Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-blue-400 font-semibold">Question {item.questionNum}</span>
+                    {item.questionType && (
+                      <span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-400 capitalize">
+                        {item.questionType}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {item.communication && (
+                      <CommunicationBadge 
+                        clarity={item.communication.clarity_score} 
+                        structure={item.communication.structure_score} 
+                      />
+                    )}
+                    <span className={`text-lg font-bold ${scoreColors.text}`}>{item.score || 0}/100</span>
+                  </div>
+                </div>
+                
+                {/* Question */}
+                <div className="mb-3">
+                  <p className="text-slate-400 text-sm mb-1">Question:</p>
+                  <p className="text-white bg-slate-700/50 rounded-lg p-3">{item.question}</p>
+                </div>
+
+                {/* Your Answer */}
+                <div className="mb-3">
+                  <p className="text-slate-400 text-sm mb-1">Your Answer:</p>
+                  <p className="text-slate-300 bg-slate-700/50 rounded-lg p-3 whitespace-pre-wrap">{item.answer}</p>
+                </div>
+
+                {/* Technical Feedback */}
+                {item.feedback && (
+                  <div className="mb-3">
+                    <p className="text-slate-400 text-sm mb-1">Technical Feedback:</p>
+                    <p className="text-yellow-200 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 whitespace-pre-wrap">{item.feedback}</p>
+                  </div>
+                )}
+
+                {/* Communication Analysis */}
+                {item.communication && (
+                  <CommunicationScore analysis={item.communication} />
+                )}
+
+                {/* Score Bar */}
+                <div className="mt-3">
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${scoreColors.bg} transition-all duration-500`}
+                      style={{ width: `${item.score || 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Continue Button */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={onComplete}
+            className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 shadow-lg"
+          >
+            Continue to HR Round →
+          </button>
+        </div>
       </div>
     )
   }

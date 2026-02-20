@@ -2,6 +2,8 @@ from typing import Dict, List, Optional
 import random
 import re
 
+from config.company_modes import get_company_config, get_company_questions, COMPANY_QUESTIONS
+
 
 # Predefined question bank organized by role and difficulty
 QUESTION_BANK = {
@@ -224,6 +226,109 @@ def generate_question(role: str, difficulty: str = "medium") -> Dict:
     }
 
 
+def generate_company_question(role: str, difficulty: str = "medium", company: str = "generic") -> Dict:
+    """
+    Generate a company-specific interview question.
+    
+    Args:
+        role: Target role (SDE, Data Analyst, ML Engineer)
+        difficulty: Question difficulty (easy, medium, hard)
+        company: Company mode (google, amazon, meta, etc.)
+        
+    Returns:
+        Dictionary with question details adapted for company style
+    """
+    company_config = get_company_config(company)
+    company_qs = COMPANY_QUESTIONS.get(company.lower(), {})
+    
+    # Determine question type based on company distribution
+    distribution = company_config.get("question_distribution", {})
+    question_type = _select_question_type(distribution)
+    
+    # Try to get company-specific question
+    if company_qs and question_type in company_qs:
+        type_questions = company_qs[question_type]
+        if type_questions:
+            q = random.choice(type_questions)
+            return _format_company_question(q, question_type, difficulty, role, company_config)
+    
+    # Fall back to standard questions with company-style modifications
+    base_question = generate_question(role, difficulty)
+    return _adapt_question_to_company(base_question, company_config, question_type)
+
+
+def _select_question_type(distribution: Dict[str, float]) -> str:
+    """Select question type based on probability distribution."""
+    if not distribution:
+        return "coding"
+    
+    rand = random.random()
+    cumulative = 0
+    
+    for qtype, prob in distribution.items():
+        cumulative += prob
+        if rand <= cumulative:
+            return qtype
+    
+    return list(distribution.keys())[0]
+
+
+def _format_company_question(
+    question_data: Dict,
+    question_type: str,
+    difficulty: str,
+    role: str,
+    company_config: Dict
+) -> Dict:
+    """Format a company-specific question."""
+    result = {
+        "question": question_data.get("question", ""),
+        "difficulty": question_data.get("difficulty", difficulty),
+        "role": role,
+        "question_type": question_type,
+        "company": company_config["name"],
+        "company_style": company_config["style"],
+    }
+    
+    # Add type-specific fields
+    if question_type == "behavioral":
+        result["principle"] = question_data.get("principle", "")
+        result["star_prompts"] = question_data.get("star_prompts", [])
+        result["keywords"] = [question_data.get("principle", "").lower(), "star", "situation", "action", "result"]
+        result["expected_points"] = ["specific example", "clear actions taken", "measurable results"]
+    else:
+        result["keywords"] = question_data.get("topics", ["problem solving", "optimization", "clarity"])
+        result["expected_points"] = question_data.get("topics", ["approach", "implementation", "complexity"])
+        result["follow_up"] = question_data.get("follow_up", "")
+    
+    return result
+
+
+def _adapt_question_to_company(base_question: Dict, company_config: Dict, question_type: str) -> Dict:
+    """Adapt a standard question to company style."""
+    question = base_question.copy()
+    
+    company_name = company_config["name"]
+    style = company_config["style"]
+    
+    # Add company context
+    question["company"] = company_name
+    question["company_style"] = style
+    question["question_type"] = question_type
+    
+    # Modify question based on company style
+    if style == "dsa_heavy" and "optimize" not in question["question"].lower():
+        question["question"] += " What is the optimal time and space complexity?"
+    elif style == "leadership_behavioral":
+        if question_type != "behavioral":
+            question["question"] += " Also, tell me about a time you faced a similar challenge."
+    elif style == "coding_systems":
+        if "scale" not in question["question"].lower():
+            question["question"] += " How would this work at massive scale?"
+    
+    return question
+
+
 def evaluate_answer(
     question: str,
     answer: str,
@@ -298,22 +403,26 @@ def _evaluate_length(answer: str, difficulty: str) -> int:
     
     min_words, max_words = ranges.get(difficulty, (50, 250))
     
-    if word_count < min_words // 2:
+    if word_count < 5:
+        return 5  # Way too short - almost no answer
+    elif word_count < 10:
+        return 10  # Very short answer
+    elif word_count < min_words // 2:
         return 20  # Too short
     elif word_count < min_words:
-        return 60  # Somewhat short
+        return 45  # Somewhat short
     elif word_count <= max_words:
         return 100  # Good length
     elif word_count <= max_words * 1.5:
-        return 80  # Slightly long but acceptable
+        return 75  # Slightly long but acceptable
     else:
-        return 60  # Too verbose
+        return 50  # Too verbose
 
 
 def _evaluate_keywords(answer_lower: str, keywords: List[str]) -> int:
     """Evaluate presence of expected technical keywords."""
     if not keywords:
-        return 70  # Default score if no keywords
+        return 30  # Default score if no keywords - be conservative
     
     found = 0
     for keyword in keywords:
@@ -326,14 +435,20 @@ def _evaluate_keywords(answer_lower: str, keywords: List[str]) -> int:
 
 def _evaluate_structure(answer: str) -> int:
     """Evaluate logical structure of the answer."""
-    score = 50  # Base score
+    score = 20  # Lower base score - structure must be earned
     
     # Check for structured elements
     sentences = re.split(r'[.!?]', answer)
     sentences = [s.strip() for s in sentences if s.strip()]
     
+    # Very few sentences = poor structure
+    if len(sentences) < 2:
+        return 10 if len(sentences) == 1 else 5
+    
     # Multiple sentences indicate structure
-    if len(sentences) >= 3:
+    if len(sentences) >= 4:
+        score += 25
+    elif len(sentences) >= 3:
         score += 15
     elif len(sentences) >= 2:
         score += 10
@@ -349,13 +464,25 @@ def _evaluate_structure(answer: str) -> int:
     transitions_found = sum(1 for word in transition_words if word in answer_lower)
     
     if transitions_found >= 3:
-        score += 20
+        score += 25
+    elif transitions_found >= 2:
+        score += 15
     elif transitions_found >= 1:
         score += 10
     
     # Check for examples
     if "example" in answer_lower or "for instance" in answer_lower:
         score += 15
+    
+    # Check for gibberish - random characters with no real words
+    words = answer.split()
+    if words:
+        # Simple gibberish detection: check if words have mostly consonants or random chars
+        gibberish_word_count = 0
+        common_words = {"the", "a", "an", "is", "are", "was", "were", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "it", "this", "that", "i", "we", "you", "they", "my", "your", "can", "will", "be", "have", "has", "do", "does", "not", "from", "by", "as", "if", "so", "what", "how", "why", "when", "where", "which"}
+        real_word_count = sum(1 for w in words if w.lower() in common_words or (len(w) > 2 and w.isalpha()))
+        if real_word_count / len(words) < 0.5:
+            score = max(5, score - 30)  # Heavy penalty for gibberish
     
     return min(100, score)
 

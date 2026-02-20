@@ -83,32 +83,44 @@ def evaluate_clarity(answer: str) -> int:
     Evaluate answer clarity based on sentence structure.
     Score out of 10.
     """
-    score = 5  # Base score
+    # Check for very short or empty answers
+    word_count = len(answer.split())
+    if word_count < 5:
+        return 1  # Way too short
+    if word_count < 10:
+        return 2  # Very short
+    if word_count < 20:
+        return 3  # Still too brief for HR answer
+    
+    score = 3  # Lower base score - clarity must be earned
     
     # Split into sentences
     sentences = re.split(r'[.!?]', answer)
     sentences = [s.strip() for s in sentences if s.strip()]
     
     if not sentences:
-        return 2
+        return 1
+    
+    if len(sentences) < 2:
+        return 2  # Single sentence - poor clarity
     
     # Calculate average sentence length
     avg_words_per_sentence = sum(len(s.split()) for s in sentences) / len(sentences)
     
     # Optimal sentence length is 15-25 words
     if 10 <= avg_words_per_sentence <= 25:
-        score += 3
+        score += 4
     elif 8 <= avg_words_per_sentence <= 30:
         score += 2
     elif avg_words_per_sentence > 40:
-        score -= 2  # Too long, hard to follow
+        score -= 1  # Too long, hard to follow
     elif avg_words_per_sentence < 5:
         score -= 1  # Too choppy
     
     # Check for run-on sentences (very long sentences)
     long_sentences = sum(1 for s in sentences if len(s.split()) > 40)
     if long_sentences == 0 and len(sentences) >= 3:
-        score += 1
+        score += 2
     
     # Check for proper sentence variation
     if len(sentences) >= 4:
@@ -125,7 +137,14 @@ def evaluate_confidence(answer_lower: str) -> int:
     Evaluate confidence based on keyword presence.
     Score out of 10.
     """
-    score = 4  # Base score
+    # Check for very short answers
+    word_count = len(answer_lower.split())
+    if word_count < 10:
+        return 2  # Can't show confidence in very short answer
+    if word_count < 20:
+        return 3
+    
+    score = 2  # Lower base score - confidence must be demonstrated
     
     # Count confidence keywords
     confidence_count = count_confidence_keywords(answer_lower)
@@ -135,10 +154,12 @@ def evaluate_confidence(answer_lower: str) -> int:
     
     # Award points based on keyword density
     if total_keywords >= 8:
-        score += 4
+        score += 5
     elif total_keywords >= 5:
-        score += 3
+        score += 4
     elif total_keywords >= 3:
+        score += 3
+    elif total_keywords >= 2:
         score += 2
     elif total_keywords >= 1:
         score += 1
@@ -157,7 +178,7 @@ def evaluate_confidence(answer_lower: str) -> int:
     hedge_count = sum(1 for h in hedging_words if h in answer_lower)
     
     if hedge_count >= 3:
-        score -= 2
+        score -= 3
     elif hedge_count >= 1:
         score -= 1
     
@@ -169,6 +190,13 @@ def evaluate_star_structure(answer_lower: str) -> int:
     Evaluate STAR method structure presence.
     Score out of 10.
     """
+    # Check for very short answers - can't have structure
+    word_count = len(answer_lower.split())
+    if word_count < 10:
+        return 1
+    if word_count < 20:
+        return 2
+    
     components_found = detect_star_components(answer_lower)
     components_count = sum(components_found.values())
     
@@ -178,11 +206,11 @@ def evaluate_star_structure(answer_lower: str) -> int:
     elif components_count == 3:
         score = 7
     elif components_count == 2:
-        score = 5
+        score = 4
     elif components_count == 1:
-        score = 3
-    else:
         score = 2
+    else:
+        score = 1  # No STAR components = very poor structure
     
     # Bonus for having both Situation and Result (key bookends)
     if components_found.get("situation") and components_found.get("result"):

@@ -1,11 +1,29 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel
 
 from services.resume_parser import extract_text_from_pdf
 from services.ats_scorer import calculate_ats_score
 from services.skill_gap_analyzer import analyze_skill_gaps
+from services.bullet_improver import improve_bullet, batch_improve_bullets
+from services.career_recommender import analyze_career_fit, get_career_path_details, get_all_career_paths
 
 router = APIRouter()
+
+
+class BulletImproveRequest(BaseModel):
+    bullet: str
+    role: str = "SDE"
+
+
+class BatchBulletRequest(BaseModel):
+    bullets: List[str]
+    role: str = "SDE"
+
+
+class CareerAnalysisRequest(BaseModel):
+    resume_text: str
+    skills: List[str] = []
 
 
 @router.post("/upload-resume")
@@ -48,7 +66,7 @@ async def upload_resume(
     return {
         "filename": file.filename,
         "role": role,
-        "resume_text": resume_text[:500] + "..." if len(resume_text) > 500 else resume_text,
+        "resume_text": resume_text,
         "ats_score": ats_result["ats_score"],
         "missing_skills": ats_result["missing_skills"],
         "weak_areas": ats_result["weak_areas"],
@@ -101,3 +119,74 @@ async def get_available_roles():
             {"id": "ML Engineer", "name": "Machine Learning Engineer"}
         ]
     }
+
+
+@router.post("/improve-bullet")
+async def improve_bullet_point(request: BulletImproveRequest):
+    """
+    Improve a single resume bullet point.
+    
+    Takes a weak bullet point and transforms it into a strong,
+    impactful statement with action verbs and metrics.
+    """
+    if not request.bullet or len(request.bullet.strip()) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Bullet point is too short"
+        )
+    
+    result = improve_bullet(request.bullet, request.role)
+    return result
+
+
+@router.post("/improve-bullets-batch")
+async def improve_bullets_batch(request: BatchBulletRequest):
+    """
+    Improve multiple resume bullet points at once.
+    """
+    if not request.bullets or len(request.bullets) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No bullet points provided"
+        )
+    
+    results = batch_improve_bullets(request.bullets, request.role)
+    return {"results": results}
+
+
+@router.post("/career-recommendation")
+async def get_career_recommendation(request: CareerAnalysisRequest):
+    """
+    Analyze resume and recommend best-fit career paths.
+    
+    Returns personalized career recommendations based on:
+    - Technical skills detected
+    - Experience patterns
+    - Project types mentioned
+    """
+    if not request.resume_text or len(request.resume_text.strip()) < 50:
+        raise HTTPException(
+            status_code=400,
+            detail="Resume text is too short for analysis"
+        )
+    
+    result = analyze_career_fit(request.resume_text, request.skills)
+    return result
+
+
+@router.get("/career-paths")
+async def list_career_paths():
+    """Get all available career paths for exploration."""
+    return {"career_paths": get_all_career_paths()}
+
+
+@router.get("/career-paths/{career_id}")
+async def get_career_path(career_id: str):
+    """Get detailed information about a specific career path."""
+    details = get_career_path_details(career_id)
+    if not details:
+        raise HTTPException(
+            status_code=404,
+            detail="Career path not found"
+        )
+    return details

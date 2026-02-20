@@ -5,4 +5,6 @@ export {
   submitAnswer,
   submitHRAnswer,
   getReport,
+  improveBullet,
+  improveBulletsBatch,
 } from './api'

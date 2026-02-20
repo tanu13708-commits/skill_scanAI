@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import resume, interview, hr, report
+from routers import resume, interview, hr, report, practice, aptitude
 
 app = FastAPI(
     title="SkillScan AI",
@@ -12,8 +12,8 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -23,6 +23,8 @@ app.include_router(resume.router, prefix="/api/resume", tags=["Resume"])
 app.include_router(interview.router, prefix="/api/interview", tags=["Interview"])
 app.include_router(hr.router, prefix="/api/hr", tags=["HR"])
 app.include_router(report.router, prefix="/api/report", tags=["Report"])
+app.include_router(practice.router, prefix="/api", tags=["Practice"])
+app.include_router(aptitude.router, prefix="/api", tags=["Aptitude"])
 
 
 @app.get("/", tags=["Health"])

@@ -21,7 +21,7 @@ const Navbar = () => {
 
   return (
     <motion.nav 
-      className="bg-white/5 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50"
+      className="bg-white/5 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50 no-print print:hidden"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
@@ -48,6 +48,7 @@ const Navbar = () => {
             {[
               { to: '/', label: 'Home', end: true },
               { to: '/interview', label: 'Interview' },
+              { to: '/practice', label: 'Practice' },
               { to: '/report', label: 'Report' },
             ].map((link, index) => (
               <motion.li 
@@ -101,6 +102,11 @@ const Navbar = () => {
                 <li>
                   <NavLink to="/interview" className={mobileLinkClasses} onClick={() => setIsMenuOpen(false)}>
                     Interview
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/practice" className={mobileLinkClasses} onClick={() => setIsMenuOpen(false)}>
+                    Practice
                   </NavLink>
                 </li>
                 <li>

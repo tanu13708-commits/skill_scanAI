@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 import { uploadResume } from '../services'
+import ResumeHighlighter from './ResumeHighlighter'
+import BulletImprover from './BulletImprover'
 
 const TARGET_ROLES = [
   { value: 'SDE', label: 'Software Development Engineer (SDE)' },
@@ -79,7 +81,7 @@ const ResumeUpload = ({ onUploadSuccess }) => {
       
       const response = await uploadResume(formData)
       setAtsResult(response)
-      onUploadSuccess?.(response)
+      // Don't navigate immediately - show results first
     } catch (err) {
       const errorMsg = typeof err === 'string' ? err : (err.message || err.detail || 'Failed to upload resume')
       setError(errorMsg)
@@ -276,55 +278,41 @@ const ResumeUpload = ({ onUploadSuccess }) => {
             </div>
           </div>
 
-          {/* Missing Skills */}
-          {atsResult.missing_skills && atsResult.missing_skills.length > 0 && (
-            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Missing Skills for {TARGET_ROLES.find(r => r.value === targetRole)?.label}
-              </h3>
-              
-              <div className="flex flex-wrap gap-2">
-                {atsResult.missing_skills.map((skill, index) => (
-                  <span 
-                    key={index}
-                    className="px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-              
-              <p className="text-sm text-slate-400 mt-4">
-                Consider adding these skills to your resume to improve your ATS score.
-              </p>
-            </div>
-          )}
+          {/* Live Keyword Highlighter */}
+          <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Live Keyword Analysis
+            </h3>
+            
+            <ResumeHighlighter
+              resumeText={atsResult.resume_text}
+              matchedSkills={atsResult.matched_skills || []}
+              missingSkills={atsResult.missing_skills || []}
+            />
+          </div>
 
-          {/* Detected Skills */}
-          {atsResult.matched_skills && atsResult.matched_skills.length > 0 && (
-            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Detected Skills
-              </h3>
-              
-              <div className="flex flex-wrap gap-2">
-                {atsResult.matched_skills.map((skill, index) => (
-                  <span 
-                    key={index}
-                    className="px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Bullet Point Improver */}
+          <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+            <BulletImprover role={targetRole} />
+          </div>
+
+          {/* Continue to Interview Button */}
+          <button
+            onClick={() => onUploadSuccess?.(atsResult)}
+            className="w-full py-4 px-6 rounded-xl font-semibold text-white
+                       bg-gradient-to-r from-green-500 to-emerald-600 
+                       hover:from-green-600 hover:to-emerald-700
+                       hover:shadow-lg hover:shadow-green-500/25
+                       transition-all duration-200 flex items-center justify-center gap-3"
+          >
+            <span>Continue to Mock Interview</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

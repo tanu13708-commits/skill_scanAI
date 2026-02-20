@@ -11,7 +11,7 @@ import {
   Legend
 } from 'recharts'
 import { getReport } from '../services'
-import { PageTransition, GlassCard } from '../components'
+import { PageTransition, GlassCard, WeaknessHeatmap } from '../components'
 import { staggerContainer, fadeInUp } from '../utils/animations'
 
 const Report = () => {
@@ -219,6 +219,27 @@ const Report = () => {
     <PageTransition>
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
+          {/* Print Header - Only visible when printing */}
+          <div className="hidden print:block print-header" style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '3px solid #2563eb', textAlign: 'center' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>SkillScan AI - Interview Performance Report</h1>
+            <p style={{ fontSize: '12px', color: '#64748b' }}>
+              Generated on: {new Date().toLocaleDateString('en-IN', { 
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric'
+              })} at {new Date().toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center', gap: '30px', fontSize: '11px', color: '#475569' }}>
+              <span>Resume Score: {reportData.resumeScore}%</span>
+              <span>Technical Score: {reportData.technicalScore}%</span>
+              <span>HR Score: {reportData.hrScore}%</span>
+              <span style={{ fontWeight: 'bold', color: '#2563eb' }}>Overall: {calculateOverallReadiness()}%</span>
+            </div>
+          </div>
+
           {/* Header */}
           <motion.div 
             className="text-center mb-10"
@@ -241,7 +262,7 @@ const Report = () => {
           </motion.div>
 
           {/* Overall Readiness */}
-          <GlassCard className="p-8 mb-8" delay={0.1}>
+          <GlassCard className="p-8 mb-8 print-section" delay={0.1}>
             <div className="flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="text-center md:text-left">
                 <h2 className="text-xl text-slate-400 mb-2">Overall Interview Readiness</h2>
@@ -311,7 +332,7 @@ const Report = () => {
 
           {/* Score Cards */}
           <motion.div 
-            className="grid md:grid-cols-3 gap-6 mb-8"
+            className="grid md:grid-cols-3 gap-6 mb-8 print-section"
             variants={staggerContainer}
             initial="hidden"
             animate="visible"
@@ -349,7 +370,7 @@ const Report = () => {
           </motion.div>
 
           {/* Charts and Improvements */}
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="grid lg:grid-cols-2 gap-8 print-section">
             {/* Skill Radar Chart */}
             <GlassCard className="p-6" delay={0.4}>
               <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
@@ -462,9 +483,29 @@ const Report = () => {
             </GlassCard>
           </div>
 
+          {/* Weakness Heatmap */}
+          <motion.div 
+            className="mt-8 print-section"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <WeaknessHeatmap 
+              skills={[
+                { name: 'DSA & Algorithms', score: Math.round(reportData.skills.problemSolving * 0.8) },
+                { name: 'Backend Development', score: reportData.technicalScore || 75 },
+                { name: 'System Design', score: Math.round(reportData.skills.technicalKnowledge * 0.5) },
+                { name: 'Communication', score: reportData.skills.communication },
+                { name: 'Leadership', score: reportData.skills.leadership },
+                { name: 'Problem Solving', score: reportData.skills.problemSolving },
+              ]}
+              title="Interview Readiness Heatmap"
+            />
+          </motion.div>
+
           {/* Actions */}
           <motion.div 
-            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 no-print print:hidden"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8 }}
@@ -477,17 +518,16 @@ const Report = () => {
                 Retake Interview
               </Link>
             </motion.div>
-            <motion.button 
-              onClick={() => window.print()}
-              className="w-full sm:w-auto px-8 py-3 rounded-xl border border-white/20 hover:border-white/40 hover:bg-white/5 backdrop-blur-sm text-white font-semibold transition-all flex items-center justify-center gap-2"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button 
+              type="button"
+              onClick={() => { window.print(); }}
+              className="w-full sm:w-auto px-8 py-3 rounded-xl border border-white/20 hover:border-white/40 hover:bg-white/5 backdrop-blur-sm text-white font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               Print Report
-            </motion.button>
+            </button>
           </motion.div>
         </div>
       </div>

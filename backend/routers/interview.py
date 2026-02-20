@@ -2,7 +2,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
-from services.interview_engine import generate_question, evaluate_answer
+from services.interview_engine import generate_question, evaluate_answer, generate_company_question
+from config.company_modes import get_company_config, get_all_companies, get_interview_strategy, get_company_questions
+from services.communication_analyzer import analyze_communication, get_communication_grade
 
 router = APIRouter()
 
@@ -11,6 +13,7 @@ router = APIRouter()
 class StartInterviewRequest(BaseModel):
     role: str = "SDE"
     difficulty: str = "medium"
+    company: str = "generic"
 
 
 class SubmitAnswerRequest(BaseModel):
@@ -18,6 +21,13 @@ class SubmitAnswerRequest(BaseModel):
     answer: str
     difficulty: str
     role: str
+    company: str = "generic"
+    question_type: str = "technical"
+
+
+class AnalyzeCommunicationRequest(BaseModel):
+    text: str
+    is_behavioral: bool = False
 
 
 class InterviewState(BaseModel):
@@ -33,12 +43,29 @@ class InterviewState(BaseModel):
 sessions = {}
 
 
+@router.get("/companies")
+async def get_companies():
+    """Get all available company interview modes."""
+    return {"companies": get_all_companies()}
+
+
+@router.get("/company/{company_id}")
+async def get_company_details(company_id: str):
+    """Get detailed interview strategy for a specific company."""
+    config = get_company_config(company_id)
+    if config["name"] == "General Practice" and company_id != "generic":
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    strategy = get_interview_strategy(company_id)
+    return strategy
+
+
 @router.post("/start-interview")
 async def start_interview(request: StartInterviewRequest):
     """
     Start a new technical interview session.
     
-    - Generates first question based on role and difficulty
+    - Generates first question based on role, difficulty, and company
     - Returns session ID and first question
     """
     valid_roles = ["SDE", "Data Analyst", "ML Engineer"]
@@ -55,8 +82,15 @@ async def start_interview(request: StartInterviewRequest):
             detail=f"Invalid difficulty. Choose from: {', '.join(valid_difficulties)}"
         )
     
-    # Generate first question
-    question_data = generate_question(request.role, request.difficulty)
+    # Get company config
+    company_config = get_company_config(request.company)
+    
+    # Generate first question with company context
+    question_data = generate_company_question(
+        role=request.role,
+        difficulty=request.difficulty,
+        company=request.company
+    )
     
     # Create session
     import uuid
@@ -64,6 +98,7 @@ async def start_interview(request: StartInterviewRequest):
     
     sessions[session_id] = {
         "role": request.role,
+        "company": request.company,
         "current_difficulty": request.difficulty,
         "questions_asked": 1,
         "total_score": 0,
@@ -74,10 +109,39 @@ async def start_interview(request: StartInterviewRequest):
     return {
         "session_id": session_id,
         "role": request.role,
+        "company": company_config["name"],
+        "company_style": company_config["style"],
         "question": question_data["question"],
         "difficulty": question_data["difficulty"],
+        "question_type": question_data.get("question_type", "technical"),
         "question_number": 1,
-        "message": "Interview started. Answer the question below."
+        "tips": company_config.get("tips", [])[:2],
+        "message": f"Interview started in {company_config['name']} mode. Answer the question below."
+    }
+
+
+@router.post("/analyze-communication")
+async def analyze_communication_endpoint(request: AnalyzeCommunicationRequest):
+    """
+    Analyze text for communication quality.
+    Returns scores for clarity, structure, and confidence.
+    """
+    if not request.text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Text cannot be empty"
+        )
+    
+    analysis = analyze_communication(request.text, request.is_behavioral)
+    
+    return {
+        "analysis": analysis,
+        "grades": {
+            "overall": get_communication_grade(analysis["overall_score"]),
+            "clarity": get_communication_grade(analysis["clarity_score"]),
+            "structure": get_communication_grade(analysis["structure_score"]),
+            "confidence": get_communication_grade(analysis["confidence_score"]),
+        }
     }
 
 
@@ -88,13 +152,20 @@ async def submit_answer(request: SubmitAnswerRequest):
     
     - Evaluates the submitted answer
     - Adjusts difficulty based on performance
-    - Returns feedback and next question
+    - Analyzes communication quality
+    - Returns feedback and next question (company-specific)
     """
     if not request.answer.strip():
         raise HTTPException(
             status_code=400,
             detail="Answer cannot be empty"
         )
+    
+    # Determine if this is a behavioral question
+    is_behavioral = request.question_type in ["behavioral", "leadership"]
+    
+    # Analyze communication quality
+    comm_analysis = analyze_communication(request.answer, is_behavioral)
     
     # Evaluate answer
     evaluation = evaluate_answer(
@@ -104,11 +175,15 @@ async def submit_answer(request: SubmitAnswerRequest):
         role=request.role
     )
     
-    # Generate next question with adjusted difficulty
-    next_question_data = generate_question(
-        request.role,
-        evaluation["next_difficulty"]
+    # Generate next question with adjusted difficulty and company context
+    next_question_data = generate_company_question(
+        role=request.role,
+        difficulty=evaluation["next_difficulty"],
+        company=request.company
     )
+    
+    # Get company config for additional context
+    company_config = get_company_config(request.company)
     
     return {
         "evaluation": {
@@ -116,9 +191,27 @@ async def submit_answer(request: SubmitAnswerRequest):
             "feedback": evaluation["feedback"],
             "breakdown": evaluation["breakdown"]
         },
+        "communication": {
+            "clarity_score": comm_analysis["clarity_score"],
+            "structure_score": comm_analysis["structure_score"],
+            "confidence_score": comm_analysis["confidence_score"],
+            "overall_score": comm_analysis["overall_score"],
+            "filler_words": comm_analysis["filler_words"][:3],
+            "filler_count": comm_analysis["filler_count"],
+            "issues": comm_analysis["issues"],
+            "suggestions": comm_analysis["suggestions"],
+            "strengths": comm_analysis["strengths"],
+            "word_count": comm_analysis["word_count"],
+            "grades": {
+                "clarity": get_communication_grade(comm_analysis["clarity_score"]),
+                "structure": get_communication_grade(comm_analysis["structure_score"]),
+            }
+        },
         "next_question": {
             "question": next_question_data["question"],
-            "difficulty": next_question_data["difficulty"]
+            "difficulty": next_question_data["difficulty"],
+            "question_type": next_question_data.get("question_type", "technical"),
+            "company": company_config["name"]
         },
         "difficulty_change": {
             "previous": request.difficulty,
